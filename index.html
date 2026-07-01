@@ -291,12 +291,12 @@ async function renderDashboard(){
   <div class="ptitle" style="font-size:16px">🏭 Por proceso</div>
   <div class="grid g3 mb12">
     ${procStats.map(p=>{
-      const pct=p.required?Math.min(100,Math.round(p.present/p.required*100)):0;
-      const col=p.present>=p.required?"var(--ok)":p.present>=p.required*.7?"var(--warn)":"var(--err)";
+      const pct=p.required_cnt?Math.min(100,Math.round(p.present/p.required_cnt*100)):0;
+      const col=p.present>=p.required_cnt?"var(--ok)":p.present>=p.required_cnt*.7?"var(--warn)":"var(--err)";
       return `<div class="card">
         <div class="flex"><span class="dot" style="background:${p.color}"></span>
           <b>${esc(p.name)}</b>
-          <span class="mla mono" style="font-size:18px;font-weight:800;color:${col}">${p.present}/${p.required}</span></div>
+          <span class="mla mono" style="font-size:18px;font-weight:800;color:${col}">${p.present}/${p.required_cnt}</span></div>
         <div class="bar"><i style="width:${pct}%;background:${col}"></i></div>
         <div class="flex" style="margin-top:8px;font-size:12px;color:var(--mt)">
           <span>👥 ${p.total} asignados</span>
