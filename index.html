@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Control de Asistencia</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#0f172a; --card:#1e293b; --card2:#273449; --bd:#334155;
+  --tx:#e2e8f0; --mt:#94a3b8; --mut:#64748b;
+  --pri:#3b82f6; --pri2:#2563eb; --ok:#10b981; --warn:#f59e0b; --err:#ef4444; --pur:#8b5cf6;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,"Segoe UI",Roboto,"Malgun Gothic",sans-serif;background:var(--bg);color:var(--tx);font-size:14px;line-height:1.5}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1180px;margin:0 auto;padding:0 14px 60px}
+/* topbar */
+.top{position:sticky;top:0;z-index:40;background:rgba(15,23,42,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--bd)}
+.top .in{max-width:1180px;margin:0 auto;display:flex;align-items:center;gap:14px;padding:10px 14px}
+.brand{font-weight:800;font-size:16px;letter-spacing:.3px;white-space:nowrap}
+.brand span{color:var(--pri)}
+.nav{display:flex;gap:4px;flex:1;overflow-x:auto;scrollbar-width:none}
+.nav::-webkit-scrollbar{display:none}
+.nav a{padding:7px 12px;border-radius:8px;color:var(--mt);font-weight:600;font-size:13px;white-space:nowrap}
+.nav a.on{background:var(--pri);color:#fff}
+.nav a:hover:not(.on){background:var(--card)}
+.shiftbadge{font-size:12px;font-weight:700;padding:5px 10px;border-radius:20px;white-space:nowrap}
+.sb-d{background:#78350f33;color:#fbbf24;border:1px solid #78350f}
+.sb-n{background:#1e3a8a33;color:#93c5fd;border:1px solid #1e3a8a}
+/* cards & layout */
+.ptitle{font-size:20px;font-weight:800;margin:18px 0 14px;display:flex;align-items:center;gap:8px}
+.grid{display:grid;gap:12px}
+.g2{grid-template-columns:repeat(2,1fr)} .g3{grid-template-columns:repeat(3,1fr)} .g4{grid-template-columns:repeat(4,1fr)}
+@media(max-width:820px){.g3,.g4{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:520px){.g2,.g3,.g4{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px}
+.card.p0{padding:0;overflow:hidden}
+.mb12{margin-bottom:12px}.mb8{margin-bottom:8px}.mt12{margin-top:12px}
+.flex{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.mla{margin-left:auto}
+.muted{color:var(--mt)}.mono{font-family:ui-monospace,Menlo,monospace}
+/* stat cards */
+.stat{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px 16px}
+.stat .k{font-size:12px;color:var(--mt);font-weight:600}
+.stat .v{font-size:26px;font-weight:800;margin-top:2px}
+.bar{height:8px;border-radius:6px;background:var(--card2);overflow:hidden;margin-top:8px}
+.bar>i{display:block;height:100%;border-radius:6px}
+/* buttons */
+.btn{border:none;border-radius:9px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer;color:#fff;background:var(--card2);transition:.12s;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{filter:brightness(1.12)}
+.btn:active{transform:translateY(1px)}
+.bp{background:var(--pri)} .bok{background:var(--ok)} .bw{background:var(--warn);color:#1a1205} .bd{background:var(--err)} .bpur{background:var(--pur)}
+.bg{background:var(--card2);color:var(--tx);border:1px solid var(--bd)}
+.bsm{padding:6px 10px;font-size:12px}
+.blg{padding:14px 20px;font-size:16px}
+/* forms */
+.fg{margin-bottom:10px}.fl{display:block;font-size:12px;color:var(--mt);font-weight:600;margin-bottom:4px}
+.fi{width:100%;background:var(--card2);border:1px solid var(--bd);color:var(--tx);border-radius:8px;padding:9px 11px;font-size:14px;font-family:inherit}
+.fi:focus{outline:none;border-color:var(--pri)}
+select.fi{cursor:pointer}
+/* table */
+.tw{overflow-x:auto;border-radius:10px;border:1px solid var(--bd)}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:520px}
+th{background:var(--card2);text-align:left;padding:9px 11px;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--mt);font-weight:700;position:sticky;top:0}
+td{padding:9px 11px;border-top:1px solid var(--bd)}
+tbody tr:hover{background:#ffffff08}
+.pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700}
+.pl-ok{background:#064e3b;color:#6ee7b7} .pl-tard{background:#78350f;color:#fcd34d}
+.pl-aus{background:#7f1d1d;color:#fca5a5} .pl-none{background:var(--card2);color:var(--mt)}
+.chip{font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px}
+/* toast */
+#toasts{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:100;display:flex;flex-direction:column;gap:8px;align-items:center}
+.toast{background:var(--card);border:1px solid var(--bd);border-left:4px solid var(--pri);padding:11px 16px;border-radius:10px;font-size:13px;font-weight:600;box-shadow:0 8px 24px #0008;animation:tin .2s;max-width:90vw}
+.toast.ok{border-left-color:var(--ok)} .toast.err{border-left-color:var(--err)} .toast.warn{border-left-color:var(--warn)}
+@keyframes tin{from{opacity:0;transform:translateY(10px)}to{opacity:1}}
+/* modal */
+.mod{position:fixed;inset:0;background:#0009;z-index:80;display:none;align-items:flex-start;justify-content:center;padding:40px 14px;overflow:auto}
+.mod.open{display:flex}
+.modin{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:20px;width:100%;max-width:560px}
+.modtitle{font-size:16px;font-weight:800;margin-bottom:14px}
+/* misc */
+.center{text-align:center}
+.empty{text-align:center;color:var(--mut);padding:40px 10px}
+.scan-in{font-size:32px;text-align:center;letter-spacing:4px;font-weight:800;padding:18px}
+.big-clock{font-size:15px;font-weight:700;color:var(--mt)}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+.hidden{display:none!important}
+.linkbtn{background:none;border:none;color:var(--pri);cursor:pointer;font-weight:700;font-size:13px;padding:0}
+input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--pri)}
+</style>
+</head>
+<body>
+<div class="top"><div class="in">
+  <div class="brand">◆ <span>Asistencia</span></div>
+  <nav class="nav" id="nav"></nav>
+  <div id="shiftBadge" class="shiftbadge sb-d"></div>
+</div></div>
+<div class="wrap" id="view"></div>
+<div id="toasts"></div>
+<div class="mod" id="modal"><div class="modin" id="modalIn"></div></div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   CONFIG — Supabase 프로젝트 정보 입력
+   (Supabase 대시보드 → Project Settings → API)
+   ══════════════════════════════════════════════════════════════ */
+const CONFIG = {
+  SUPABASE_URL: "https://rblvroleeozttebiyfot.supabase.co/rest/v1/",        // 예: https://xxxx.supabase.co
+  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJibHZyb2xlZW96dHRlYml5Zm90Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI5MjA1MjUsImV4cCI6MjA5ODQ5NjUyNX0.VIbEXzurTBNMtlNfNtqBCOJ9MmuTGE1TY9cSLpzYmsc"
+};
+
+/* ── 상수 ────────────────────────────────────────────────────── */
+const EMP_TYPES = ["Turno A","Turno B","Turno C","Fijo Semana","Fijo Fin de Semana","Fijo Diurno"];
+const SHIFTS    = ["Día","Noche"];
+const STATUSES  = ["Activo","Licencia","Retirado"];
+const WORK_TYPES= ["Normal","H.Extra","Recuperación"];
+const ABS_TYPES = ["Vacaciones","Enfermedad","Falta injustificada"];
+
+/* ══════════════════════════════════════════════════════════════
+   Supabase REST 헬퍼  (자주검사 앱과 동일 패턴)
+   ══════════════════════════════════════════════════════════════ */
+const CONFIGURED = CONFIG.SUPABASE_URL.startsWith("http");
+async function api(path, {method="GET", body, prefer}={}){
+  if(!CONFIGURED) throw new Error("NO_CONFIG");
+  const res = await fetch(`${CONFIG.SUPABASE_URL}/rest/v1/${path}`, {
+    method,
+    headers:{
+      apikey: CONFIG.SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${CONFIG.SUPABASE_ANON_KEY}`,
+      "Content-Type":"application/json",
+      ...(prefer?{Prefer:prefer}:{})
+    },
+    body: body!==undefined ? JSON.stringify(body) : undefined
+  });
+  if(!res.ok){ throw new Error(`${res.status} ${await res.text()}`); }
+  if(res.status===204) return null;
+  const txt = await res.text();
+  return txt ? JSON.parse(txt) : null;
+}
+const sel    = (t,q="")   => api(`${t}?${q}`);
+const insert = (t,rows,up=false)=> api(t,{method:"POST",body:Array.isArray(rows)?rows:[rows],
+                 prefer: up?"resolution=merge-duplicates,return=representation":"return=representation"});
+const patch  = (t,q,body) => api(`${t}?${q}`,{method:"PATCH",body,prefer:"return=representation"});
+const del    = (t,q)      => api(`${t}?${q}`,{method:"DELETE"});
+
+/* ══════════════════════════════════════════════════════════════
+   상태 & 캐시
+   ══════════════════════════════════════════════════════════════ */
+const S = { settings:{}, processes:[], ranks:[], employees:[] };
+const today = () => new Date().toLocaleDateString("en-CA");            // YYYY-MM-DD (로컬)
+const nowHM = () => new Date().toTimeString().slice(0,5);              // HH:MM
+const $  = (s,r=document)=>r.querySelector(s);
+const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
+const esc= s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function toast(msg,type=""){
+  const d=document.createElement("div"); d.className="toast "+type; d.textContent=msg;
+  $("#toasts").appendChild(d); setTimeout(()=>{d.style.opacity=0;setTimeout(()=>d.remove(),300)},2600);
+}
+function openModal(html){ $("#modalIn").innerHTML=html; $("#modal").classList.add("open"); }
+function closeModal(){ $("#modal").classList.remove("open"); }
+$("#modal").addEventListener("click",e=>{ if(e.target.id==="modal") closeModal(); });
+
+/* ══════════════════════════════════════════════════════════════
+   비즈니스 로직 (app.py 이식)
+   ══════════════════════════════════════════════════════════════ */
+function currentShift(){
+  const h=new Date().getHours();
+  const ds=+(S.settings.day_start??6), ns=+(S.settings.night_start??18);
+  return (ds<=h && h<ns) ? "Día" : "Noche";
+}
+async function teamShift(team,dstr){
+  const r=await sel("team_schedule",`team=eq.${team}&sch_date=eq.${dstr}&select=shift`);
+  return r&&r[0]?r[0].shift:null;
+}
+async function isWorkDay(emp,dstr){
+  const wd=new Date(dstr+"T00:00:00").getDay();   // 0=일..6=토
+  const et=emp.emp_type;
+  if(["Turno A","Turno B","Turno C"].includes(et)){
+    const s=await teamShift(et.slice(-1),dstr); return !!(s && s!=="Descanso");
+  }
+  // JS: 0=Dom,1=Lun..6=Sab  |  app.py weekday: 0=Lun..6=Dom
+  const py=(wd+6)%7;
+  if(et==="Fijo Semana")        return [0,1,2,3].includes(py);
+  if(et==="Fijo Fin de Semana") return [4,5,0,1].includes(py);
+  if(et==="Fijo Diurno")        return [0,1,2,3,4].includes(py);
+  return true;
+}
+async function stdTime(emp,dstr){
+  const et=emp.emp_type;
+  if(["Turno A","Turno B","Turno C"].includes(et)){
+    const s=await teamShift(et.slice(-1),dstr);
+    if(s) return s==="Noche"?"20:00":"06:00";
+  }
+  return emp.shift==="Noche"?"20:00":"06:00";
+}
+async function doScan(empId, workType="Normal", workProcess=""){
+  const emp=S.employees.find(e=>e.emp_id===empId.toUpperCase());
+  if(!emp || emp.status!=="Activo") return {ok:false,msg:"Código no registrado o inactivo."};
+  const d=today(), t=nowHM();
+  const existing=await sel("attendance",`emp_id=eq.${emp.emp_id}&att_date=eq.${d}&select=check_in`);
+  if(existing&&existing.length) return {ok:false,msg:`Ya registrado — ${emp.name} (${existing[0].check_in})`};
+  const std=await stdTime(emp,d);
+  const [sh,sm]=std.split(":").map(Number),[ch,cm]=t.split(":").map(Number);
+  const att=(ch*60+cm)<=(sh*60+sm+10)?"Presente":"Tardanza";
+  const shift=currentShift(), wp=workProcess||emp.process;
+  await insert("attendance",{emp_id:emp.emp_id,att_date:d,check_in:t,att_status:att,
+    work_type:workType,work_process:wp,shift_type:shift,abs_type:""});
+  let tag=att==="Tardanza"?" [TARDANZA]":""; if(workType!=="Normal") tag+=` [${workType}]`;
+  return {ok:true,msg:`✓ ${emp.name} (${emp.process}) ${t} ${shift==="Día"?"☀":"🌙"}${shift}${tag}`,att};
+}
+
+/* ── 마스터 로딩 ─────────────────────────────────────────────── */
+async function loadMasters(){
+  const [st,pr,rk,em]=await Promise.all([
+    sel("settings","select=key,value"),
+    sel("processes","select=*&order=name"),
+    sel("ranks","select=name&order=name"),
+    sel("employees","select=*&order=process,name")
+  ]);
+  S.settings={}; (st||[]).forEach(r=>S.settings[r.key]=r.value);
+  S.processes=pr||[]; S.ranks=(rk||[]).map(r=>r.name); S.employees=em||[];
+}
+const activeEmps = () => S.employees.filter(e=>e.status==="Activo");
+async function todayRecords(){
+  const d=today();
+  const recs=await sel("attendance",`att_date=eq.${d}&select=*`);
+  const map={}; (recs||[]).forEach(r=>map[r.emp_id]=r);
+  return activeEmps().map(e=>({...e, a:map[e.emp_id]||null}));
+}
+
+/* ══════════════════════════════════════════════════════════════
+   라우터 & 네비게이션
+   ══════════════════════════════════════════════════════════════ */
+const ROUTES=[
+  {id:"",     label:"📊 Panel",     fn:renderDashboard},
+  {id:"scan", label:"✅ Marcar",    fn:renderScan},
+  {id:"hoy",  label:"📋 Hoy",       fn:renderHoy},
+  {id:"hist", label:"📅 Historial", fn:renderHist},
+  {id:"turnos",label:"🔄 Turnos",   fn:renderTurnos},
+  {id:"admin",label:"⚙ Admin",      fn:renderAdmin},
+];
+function buildNav(cur){
+  $("#nav").innerHTML=ROUTES.map(r=>
+    `<a href="#/${r.id}" class="${r.id===cur?'on':''}">${r.label}</a>`).join("");
+  const sh=currentShift();
+  const b=$("#shiftBadge"); b.className="shiftbadge "+(sh==="Día"?"sb-d":"sb-n");
+  b.textContent=(sh==="Día"?"☀ ":"🌙 ")+sh;
+}
+async function router(){
+  const hash=location.hash.replace(/^#\//,""); const [id]=hash.split("/");
+  const route=ROUTES.find(r=>r.id===id)||ROUTES[0];
+  buildNav(route.id);
+  $("#view").innerHTML=`<div class="empty">Cargando…</div>`;
+  try{ await route.fn(); }
+  catch(e){ $("#view").innerHTML=`<div class="empty">⚠ ${esc(e.message)}</div>`; }
+}
+window.addEventListener("hashchange",router);
+
+/* ══════════════════════════════════════════════════════════════
+   화면 1 — Panel (대시보드)
+   ══════════════════════════════════════════════════════════════ */
+async function renderDashboard(){
+  const recs=await todayRecords();
+  const present=recs.filter(r=>r.a&&["Presente","Tardanza"].includes(r.a.att_status));
+  const tard=recs.filter(r=>r.a&&r.a.att_status==="Tardanza");
+  const abs=recs.filter(r=>!r.a||r.a.att_status==="Ausente");
+  // 공정별 통계
+  const procStats=S.processes.map(p=>{
+    const emps=activeEmps().filter(e=>e.process===p.name);
+    const pres=present.filter(r=>(r.a.work_process||r.process)===p.name);
+    return {...p, total:emps.length, present:pres.length,
+      extra:pres.filter(r=>r.a.work_type==="H.Extra").length,
+      recup:pres.filter(r=>r.a.work_type==="Recuperación").length};
+  });
+  // 직급별
+  const byRank={};
+  activeEmps().forEach(e=>{ (byRank[e.rank]=byRank[e.rank]||{total:0,day:0,night:0}).total++; });
+  present.forEach(r=>{ const b=byRank[r.rank]; if(!b)return; if(r.a.shift_type==="Día")b.day++; else b.night++; });
+
+  $("#view").innerHTML=`
+  <div class="ptitle">📊 Panel del día <span class="muted" style="font-size:13px;font-weight:600">${today()}</span></div>
+  <div class="grid g4 mb12">
+    ${statCard("Presentes",present.length,activeEmps().length,"var(--ok)")}
+    ${statCard("Tardanzas",tard.length,activeEmps().length,"var(--warn)")}
+    ${statCard("Ausentes",abs.length,activeEmps().length,"var(--err)")}
+    ${statCard("Total activos",activeEmps().length,activeEmps().length,"var(--pri)")}
+  </div>
+  <div class="ptitle" style="font-size:16px">🏭 Por proceso</div>
+  <div class="grid g3 mb12">
+    ${procStats.map(p=>{
+      const pct=p.required?Math.min(100,Math.round(p.present/p.required*100)):0;
+      const col=p.present>=p.required?"var(--ok)":p.present>=p.required*.7?"var(--warn)":"var(--err)";
+      return `<div class="card">
+        <div class="flex"><span class="dot" style="background:${p.color}"></span>
+          <b>${esc(p.name)}</b>
+          <span class="mla mono" style="font-size:18px;font-weight:800;color:${col}">${p.present}/${p.required}</span></div>
+        <div class="bar"><i style="width:${pct}%;background:${col}"></i></div>
+        <div class="flex" style="margin-top:8px;font-size:12px;color:var(--mt)">
+          <span>👥 ${p.total} asignados</span>
+          ${p.extra?`<span class="chip" style="background:#7c2d12;color:#fdba74">★ ${p.extra} extra</span>`:""}
+          ${p.recup?`<span class="chip" style="background:#0c4a6e;color:#7dd3fc">◆ ${p.recup} recup</span>`:""}
+        </div></div>`;
+    }).join("")}
+  </div>
+  <div class="ptitle" style="font-size:16px">🏷 Por cargo</div>
+  <div class="tw card p0"><table>
+    <thead><tr><th>Cargo</th><th>Total</th><th>☀ Día</th><th>🌙 Noche</th><th>Presente</th></tr></thead>
+    <tbody>${Object.entries(byRank).map(([r,b])=>`<tr>
+      <td style="font-weight:600">${esc(r)}</td><td class="mono">${b.total}</td>
+      <td class="mono">${b.day}</td><td class="mono">${b.night}</td>
+      <td><span class="pill ${b.day+b.night>=b.total?'pl-ok':'pl-tard'}">${b.day+b.night}/${b.total}</span></td>
+    </tr>`).join("")||`<tr><td colspan="5" class="empty">Sin datos</td></tr>`}</tbody>
+  </table></div>`;
+}
+function statCard(k,v,total,col){
+  const pct=total?Math.round(v/total*100):0;
+  return `<div class="stat"><div class="k">${k}</div>
+    <div class="v" style="color:${col}">${v}</div>
+    <div class="bar"><i style="width:${pct}%;background:${col}"></i></div></div>`;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   화면 2 — Marcar (출퇴근 스캔)
+   ══════════════════════════════════════════════════════════════ */
+async function renderScan(){
+  const recs=await todayRecords();
+  const done=recs.filter(r=>r.a).sort((a,b)=>(b.a.check_in||"").localeCompare(a.a.check_in||""));
+  $("#view").innerHTML=`
+  <div class="ptitle">✅ Marcar asistencia</div>
+  <div class="grid g2">
+    <div class="card">
+      <div class="fg"><label class="fl">Código de empleado</label>
+        <input id="scanCode" class="fi scan-in" placeholder="EMP___" autocomplete="off" autofocus></div>
+      <div class="grid g2">
+        <div class="fg"><label class="fl">Tipo de trabajo</label>
+          <select id="scanWT" class="fi">${WORK_TYPES.map(w=>`<option>${w}</option>`).join("")}</select></div>
+        <div class="fg"><label class="fl">Proceso (opcional)</label>
+          <select id="scanProc" class="fi"><option value="">— Predeterminado —</option>
+            ${S.processes.map(p=>`<option>${esc(p.name)}</option>`).join("")}</select></div>
+      </div>
+      <button class="btn bok blg" style="width:100%" id="scanBtn">✅ Registrar entrada</button>
+      <div class="muted center" style="margin-top:8px;font-size:12px">Marcados hoy: <b>${done.length}</b> / ${recs.length}</div>
+    </div>
+    <div class="card p0">
+      <div style="padding:12px 14px;font-weight:700;border-bottom:1px solid var(--bd)">🕒 Últimos registros</div>
+      <div class="tw"><table><thead><tr><th>Hora</th><th>Empleado</th><th>Proceso</th><th>Estado</th></tr></thead>
+      <tbody id="scanList">${scanRows(done)}</tbody></table></div>
+    </div>
+  </div>`;
+  const code=$("#scanCode");
+  async function go(){
+    const v=code.value.trim(); if(!v) return;
+    $("#scanBtn").disabled=true;
+    const r=await doScan(v,$("#scanWT").value,$("#scanProc").value);
+    toast(r.msg, r.ok?"ok":"err");
+    $("#scanBtn").disabled=false; code.value=""; code.focus();
+    if(r.ok){ const recs=await todayRecords();
+      $("#scanList").innerHTML=scanRows(recs.filter(x=>x.a).sort((a,b)=>(b.a.check_in||"").localeCompare(a.a.check_in||""))); }
+  }
+  $("#scanBtn").onclick=go;
+  code.addEventListener("keydown",e=>{ if(e.key==="Enter") go(); });
+}
+function scanRows(list){
+  if(!list.length) return `<tr><td colspan="4" class="empty">Sin registros</td></tr>`;
+  return list.slice(0,25).map(r=>{
+    const st=r.a.att_status, cls=st==="Presente"?"pl-ok":st==="Tardanza"?"pl-tard":"pl-aus";
+    return `<tr><td class="mono">${r.a.check_in||"—"}</td><td style="font-weight:600">${esc(r.name)}</td>
+      <td class="muted">${esc(r.a.work_process||r.process)}</td>
+      <td><span class="pill ${cls}">${st}</span>${r.a.work_type!=="Normal"?` <span class="chip" style="background:#7c2d12;color:#fdba74">${r.a.work_type}</span>`:""}</td></tr>`;
+  }).join("");
+}
+
+/* ══════════════════════════════════════════════════════════════
+   화면 3 — Hoy (오늘 현황)
+   ══════════════════════════════════════════════════════════════ */
+let hoyShift="";
+async function renderHoy(){
+  const recs=await todayRecords();
+  const filt=hoyShift?recs.filter(r=>r.a&&r.a.shift_type===hoyShift):recs;
+  $("#view").innerHTML=`
+  <div class="ptitle">📋 Asistencia de hoy <span class="muted" style="font-size:13px;font-weight:600">${today()}</span></div>
+  <div class="flex mb12">
+    <div class="flex">
+      ${["","Día","Noche"].map(s=>`<button class="btn bsm ${hoyShift===s?'bp':'bg'}" onclick="setHoyShift('${s}')">${s===""?"Todos":(s==="Día"?"☀ Día":"🌙 Noche")}</button>`).join("")}
+    </div>
+    <button class="btn bok bsm mla" onclick="exportTodayExcel()">📥 Excel del día</button>
+  </div>
+  <div class="tw card p0"><table><thead><tr>
+    <th>Cód.</th><th>Empleado</th><th>Proceso</th><th>Cargo</th><th>Turno</th><th>Entrada</th><th>Estado</th><th>Acción</th>
+  </tr></thead><tbody>
+  ${filt.map(r=>{
+    const a=r.a;
+    const st=a?a.att_status:"Ausente";
+    const cls=st==="Presente"?"pl-ok":st==="Tardanza"?"pl-tard":"pl-aus";
+    const shiftIco=a?(a.shift_type==="Día"?"☀":"🌙"):"—";
+    return `<tr>
+      <td class="mono muted">${esc(r.emp_id)}</td>
+      <td style="font-weight:600">${esc(r.name)}</td>
+      <td class="muted">${esc(a&&a.work_process||r.process)}</td>
+      <td class="muted">${esc(r.rank)}</td>
+      <td>${shiftIco} ${a?a.shift_type:""}</td>
+      <td class="mono">${a?a.check_in||"—":"—"}</td>
+      <td><span class="pill ${cls}">${st}</span>${a&&a.work_type!=="Normal"?` <span class="chip" style="background:#7c2d12;color:#fdba74">${a.work_type}</span>`:""}${a&&a.abs_type?` <span class="chip" style="background:#7f1d1d;color:#fca5a5">${a.abs_type}</span>`:""}</td>
+      <td class="flex" style="gap:4px">
+        ${a?`<button class="btn bd bsm" onclick="delRecord('${r.emp_id}')">🗑</button>`
+            :`<button class="btn bw bsm" onclick="markAbsence('${r.emp_id}','${esc(r.name)}')">Ausencia</button>`}
+      </td></tr>`;
+  }).join("")||`<tr><td colspan="8" class="empty">Sin registros</td></tr>`}
+  </tbody></table></div>`;
+}
+window.setHoyShift=s=>{ hoyShift=s; renderHoy(); };
+window.delRecord=async id=>{ await del("attendance",`emp_id=eq.${id}&att_date=eq.${today()}`); toast("Registro eliminado","ok"); renderHoy(); };
+window.markAbsence=(id,name)=>{
+  openModal(`<div class="modtitle">Marcar ausencia — ${name}</div>
+    <div class="fg"><label class="fl">Tipo de ausencia</label>
+      <select id="absType" class="fi">${ABS_TYPES.map(a=>`<option>${a}</option>`).join("")}</select></div>
+    <div class="flex"><button class="btn bp" onclick="saveAbsence('${id}')">Guardar</button>
+      <button class="btn bg" onclick="closeModal()">Cancelar</button></div>`);
+};
+window.saveAbsence=async id=>{
+  await insert("attendance",{emp_id:id,att_date:today(),check_in:null,att_status:"Ausente",
+    work_type:"Normal",work_process:"",shift_type:currentShift(),abs_type:$("#absType").value},true);
+  closeModal(); toast("Ausencia registrada","ok"); renderHoy();
+};
+
+/* ══════════════════════════════════════════════════════════════
+   화면 4 — Historial (월별 이력)
+   ══════════════════════════════════════════════════════════════ */
+let histY=new Date().getFullYear(), histM=new Date().getMonth()+1;
+async function renderHist(){
+  const emps=activeEmps();
+  const pref=`${histY}-${String(histM).padStart(2,"0")}`;
+  const recs=await sel("attendance",`att_date=like.${pref}*&select=*`);
+  const byEmp={}; (recs||[]).forEach(r=>{ (byEmp[r.emp_id]=byEmp[r.emp_id]||[]).push(r); });
+  const rows=emps.map(e=>{
+    const list=byEmp[e.emp_id]||[];
+    const c={Presente:0,Tardanza:0,Ausente:0,HExtra:0,Recup:0};
+    list.forEach(r=>{ if(c[r.att_status]!==undefined)c[r.att_status]++;
+      if(r.work_type==="H.Extra")c.HExtra++; if(r.work_type==="Recuperación")c.Recup++; });
+    return {e,c};
+  });
+  const years=[]; for(let y=new Date().getFullYear();y>=2022;y--)years.push(y);
+  $("#view").innerHTML=`
+  <div class="ptitle">📅 Historial mensual</div>
+  <div class="flex mb12">
+    <select id="hY" class="fi" style="max-width:120px" onchange="histSet()">${years.map(y=>`<option ${y===histY?"selected":""}>${y}</option>`).join("")}</select>
+    <select id="hM" class="fi" style="max-width:120px" onchange="histSet()">${Array.from({length:12},(_,i)=>i+1).map(m=>`<option ${m===histM?"selected":""} value="${m}">${m}月</option>`).join("")}</select>
+    <button class="btn bok bsm mla" onclick="exportMonthlyAll()">📥 Excel (todos)</button>
+  </div>
+  <div class="tw card p0"><table><thead><tr>
+    <th>Cód.</th><th>Empleado</th><th>Proceso</th><th>✅ Pres.</th><th>⏰ Tard.</th><th>❌ Aus.</th><th>★ Extra</th><th>◆ Recup.</th><th></th>
+  </tr></thead><tbody>
+  ${rows.map(({e,c})=>`<tr>
+    <td class="mono muted">${esc(e.emp_id)}</td><td style="font-weight:600">${esc(e.name)}</td>
+    <td class="muted">${esc(e.process)}</td>
+    <td class="mono" style="color:var(--ok)">${c.Presente}</td>
+    <td class="mono" style="color:var(--warn)">${c.Tardanza}</td>
+    <td class="mono" style="color:var(--err)">${c.Ausente}</td>
+    <td class="mono">${c.HExtra}</td><td class="mono">${c.Recup}</td>
+    <td><button class="btn bg bsm" onclick="exportMonthlyOne('${e.emp_id}')">📄</button></td>
+  </tr>`).join("")||`<tr><td colspan="9" class="empty">Sin datos</td></tr>`}
+  </tbody></table></div>`;
+}
+window.histSet=()=>{ histY=+$("#hY").value; histM=+$("#hM").value; renderHist(); };
+
+/* ══════════════════════════════════════════════════════════════
+   화면 5 — Turnos (팀 A/B/C 근무표)
+   ══════════════════════════════════════════════════════════════ */
+let tY=new Date().getFullYear(), tM=new Date().getMonth()+1;
+const SHIFT_OPTS=["","Día","Noche","Descanso"];
+async function renderTurnos(){
+  const pref=`${tY}-${String(tM).padStart(2,"0")}`;
+  const rows=await sel("team_schedule",`sch_date=like.${pref}*&select=*`);
+  const map={}; (rows||[]).forEach(r=>map[`${r.team}|${r.sch_date}`]=r.shift);
+  const days=new Date(tY,tM,0).getDate();
+  const years=[]; for(let y=new Date().getFullYear()+1;y>=2022;y--)years.push(y);
+  const teams=["A","B","C"];
+  let body="";
+  for(let d=1;d<=days;d++){
+    const ds=`${pref}-${String(d).padStart(2,"0")}`;
+    const wd=new Date(ds+"T00:00:00").getDay();
+    const wknd=wd===0||wd===6;
+    body+=`<tr${wknd?' style="background:#ffffff05"':''}>
+      <td class="mono" style="font-weight:700">${d} <span class="muted">${["日","月","火","水","木","金","土"][wd]}</span></td>
+      ${teams.map(tm=>{
+        const cur=map[`${tm}|${ds}`]||"";
+        return `<td><select class="fi bsm" style="padding:4px 6px" onchange="saveTurno('${tm}','${ds}',this.value)">
+          ${SHIFT_OPTS.map(o=>`<option value="${o}" ${o===cur?"selected":""}>${o||"—"}</option>`).join("")}</select></td>`;
+      }).join("")}</tr>`;
+  }
+  $("#view").innerHTML=`
+  <div class="ptitle">🔄 Turnos de equipos (A/B/C)</div>
+  <div class="flex mb12">
+    <select id="tY" class="fi" style="max-width:120px" onchange="turnoSet()">${years.map(y=>`<option ${y===tY?"selected":""}>${y}</option>`).join("")}</select>
+    <select id="tM" class="fi" style="max-width:120px" onchange="turnoSet()">${Array.from({length:12},(_,i)=>i+1).map(m=>`<option ${m===tM?"selected":""} value="${m}">${m}月</option>`).join("")}</select>
+    <span class="muted" style="font-size:12px">교대 근무팀의 날짜별 주/야/휴무 지정</span>
+  </div>
+  <div class="tw card p0"><table style="min-width:420px"><thead><tr>
+    <th>Fecha</th><th>Equipo A</th><th>Equipo B</th><th>Equipo C</th></tr></thead>
+    <tbody>${body}</tbody></table></div>`;
+}
+window.turnoSet=()=>{ tY=+$("#tY").value; tM=+$("#tM").value; renderTurnos(); };
+window.saveTurno=async(team,ds,shift)=>{
+  if(shift==="") { await del("team_schedule",`team=eq.${team}&sch_date=eq.${ds}`); }
+  else { await insert("team_schedule",{team,sch_date:ds,shift},true); }
+  toast(`${team} · ${ds} → ${shift||"—"}`,"ok");
+};
+
+/* ══════════════════════════════════════════════════════════════
+   화면 6 — Admin (관리자)
+   ══════════════════════════════════════════════════════════════ */
+let adminTab="emp";
+async function renderAdmin(){
+  $("#view").innerHTML=`
+  <div class="ptitle">⚙ Administración</div>
+  <div class="flex mb12">
+    ${[["emp","👤 Empleados"],["proc","🏭 Procesos"],["rank","🏷 Cargos"],["cfg","⚙ Config"]]
+      .map(([id,l])=>`<button class="btn bsm ${adminTab===id?'bp':'bg'}" onclick="setAdminTab('${id}')">${l}</button>`).join("")}
+  </div>
+  <div id="adminBody"></div>`;
+  ({emp:adminEmp,proc:adminProc,rank:adminRank,cfg:adminCfg}[adminTab])();
+}
+window.setAdminTab=t=>{ adminTab=t; renderAdmin(); };
+
+function adminEmp(){
+  $("#adminBody").innerHTML=`
+  <div class="flex mb12">
+    <button class="btn bg bsm" onclick="downloadTemplate()">📤 Plantilla Excel</button>
+    <label class="btn bpur bsm" style="cursor:pointer">📥 Importar Excel
+      <input type="file" accept=".xlsx,.xls" style="display:none" onchange="importEmployees(this)"></label>
+    <button class="btn bp bsm mla" onclick="empModal()">+ Nuevo empleado</button>
+  </div>
+  <div class="tw card p0"><table><thead><tr>
+    <th>Cód.</th><th>Nombre</th><th>Proceso</th><th>Cargo</th><th>Tipo</th><th>Turno</th><th>H.Std</th><th>Estado</th><th></th>
+  </tr></thead><tbody>
+  ${S.employees.map(e=>`<tr>
+    <td class="mono muted">${esc(e.emp_id)}</td><td style="font-weight:600">${esc(e.name)}</td>
+    <td class="muted">${esc(e.process)}</td><td class="muted">${esc(e.rank)}</td>
+    <td class="muted" style="font-size:11px">${esc(e.emp_type)}</td>
+    <td>${e.shift==="Día"?"☀":"🌙"} ${e.shift}</td><td class="mono">${esc(e.std_time)}</td>
+    <td style="color:${e.status==="Activo"?"var(--ok)":"var(--mut)"}">${e.status}</td>
+    <td class="flex" style="gap:4px">
+      <button class="btn bg bsm" onclick='empModal(${JSON.stringify(e)})'>✏</button>
+      <button class="btn bd bsm" onclick="delEmp('${e.emp_id}')">🗑</button></td>
+  </tr>`).join("")||`<tr><td colspan="9" class="empty">Sin empleados</td></tr>`}
+  </tbody></table></div>`;
+}
+window.empModal=(e=null)=>{
+  const v=(k,d="")=>e?esc(e[k]):d;
+  const optS=(arr,cur)=>arr.map(o=>`<option ${o===cur?"selected":""}>${o}</option>`).join("");
+  openModal(`<div class="modtitle">${e?"Editar":"Nuevo"} empleado</div>
+    <input type="hidden" id="eOrig" value="${e?esc(e.emp_id):""}">
+    <div class="grid g2">
+      <div class="fg"><label class="fl">Código *</label><input id="eId" class="fi" value="${v("emp_id")}"></div>
+      <div class="fg"><label class="fl">Nombre *</label><input id="eNm" class="fi" value="${v("name")}"></div>
+      <div class="fg"><label class="fl">Proceso *</label><select id="ePr" class="fi">${optS(S.processes.map(p=>p.name),e?e.process:"")}</select></div>
+      <div class="fg"><label class="fl">Cargo</label><input id="eRk" class="fi" list="rkl" value="${v("rank","Operario")}"><datalist id="rkl">${S.ranks.map(r=>`<option value="${esc(r)}">`).join("")}</datalist></div>
+      <div class="fg"><label class="fl">Tipo turno</label><select id="eTp" class="fi">${optS(EMP_TYPES,e?e.emp_type:"Turno A")}</select></div>
+      <div class="fg"><label class="fl">Turno</label><select id="eSh" class="fi">${optS(SHIFTS,e?e.shift:"Día")}</select></div>
+      <div class="fg"><label class="fl">H. Estándar</label><input id="eTm" class="fi" value="${v("std_time","06:00")}"></div>
+      <div class="fg"><label class="fl">Situación</label><select id="eSt" class="fi">${optS(STATUSES,e?e.status:"Activo")}</select></div>
+      <div class="fg"><label class="fl">F. Ingreso</label><input id="eHd" class="fi" type="date" value="${v("hire_date")}"></div>
+    </div>
+    <div class="flex"><button class="btn bp" onclick="saveEmp()">Guardar</button>
+      <button class="btn bg" onclick="closeModal()">Cancelar</button></div>`);
+};
+window.saveEmp=async()=>{
+  const g=id=>$("#"+id).value.trim();
+  const emp_id=g("eId").toUpperCase(), name=g("eNm"), process=g("ePr");
+  if(!emp_id||!name||!process){ toast("Código, nombre y proceso son obligatorios","err"); return; }
+  const row={emp_id,name,process,rank:g("eRk")||"Operario",emp_type:g("eTp"),shift:g("eSh"),
+    std_time:g("eTm")||"06:00",status:g("eSt"),hire_date:g("eHd")};
+  const orig=$("#eOrig").value;
+  if(!S.ranks.includes(row.rank)) await insert("ranks",{name:row.rank},true).catch(()=>{});
+  if(orig && orig!==emp_id) await del("employees",`emp_id=eq.${orig}`);
+  await insert("employees",row,true);
+  closeModal(); await loadMasters(); toast("Empleado guardado","ok"); renderAdmin();
+};
+window.delEmp=async id=>{ if(!confirm("¿Eliminar empleado "+id+"?"))return;
+  await del("employees",`emp_id=eq.${id}`); await loadMasters(); toast("Eliminado","ok"); renderAdmin(); };
+
+function adminProc(){
+  $("#adminBody").innerHTML=`
+  <button class="btn bp bsm mb12" onclick="procModal()">+ Nuevo proceso</button>
+  <div class="tw card p0"><table><thead><tr><th>Nombre</th><th>Personal req.</th><th>Color</th><th></th></tr></thead><tbody>
+  ${S.processes.map(p=>`<tr>
+    <td style="font-weight:600"><span class="dot" style="background:${p.color};margin-right:6px"></span>${esc(p.name)}</td>
+    <td class="mono">${p.required_cnt}</td>
+    <td><span class="chip" style="background:${p.color};color:#fff">${p.color}</span></td>
+    <td class="flex" style="gap:4px"><button class="btn bg bsm" onclick='procModal(${JSON.stringify(p)})'>✏</button>
+      <button class="btn bd bsm" onclick="delProc(${p.id})">🗑</button></td>
+  </tr>`).join("")||`<tr><td colspan="4" class="empty">Sin procesos</td></tr>`}
+  </tbody></table></div>`;
+}
+window.procModal=(p=null)=>{
+  openModal(`<div class="modtitle">${p?"Editar":"Nuevo"} proceso</div>
+    <input type="hidden" id="pId" value="${p?p.id:""}">
+    <div class="fg"><label class="fl">Nombre *</label><input id="pNm" class="fi" value="${p?esc(p.name):""}"></div>
+    <div class="grid g2">
+      <div class="fg"><label class="fl">Personal requerido</label><input id="pRc" class="fi" type="number" min="0" value="${p?p.required_cnt:5}"></div>
+      <div class="fg"><label class="fl">Color</label><div class="flex"><input id="pCo" class="fi" value="${p?p.color:"#3B82F6"}" style="flex:1">
+        <input type="color" value="${p?p.color:"#3B82F6"}" style="width:40px;height:40px;border:none;border-radius:8px;cursor:pointer" oninput="document.getElementById('pCo').value=this.value"></div></div>
+    </div>
+    <div class="flex"><button class="btn bp" onclick="saveProc()">Guardar</button>
+      <button class="btn bg" onclick="closeModal()">Cancelar</button></div>`);
+};
+window.saveProc=async()=>{
+  const name=$("#pNm").value.trim(); if(!name){toast("Nombre obligatorio","err");return;}
+  const row={name,required_cnt:+$("#pRc").value||0,color:$("#pCo").value};
+  const id=$("#pId").value;
+  if(id) await patch("processes",`id=eq.${id}`,row); else await insert("processes",row,true);
+  closeModal(); await loadMasters(); toast("Proceso guardado","ok"); renderAdmin();
+};
+window.delProc=async id=>{ if(!confirm("¿Eliminar proceso?"))return;
+  await del("processes",`id=eq.${id}`); await loadMasters(); toast("Eliminado","ok"); renderAdmin(); };
+
+function adminRank(){
+  $("#adminBody").innerHTML=`
+  <div class="flex mb12">
+    <input id="rkNew" class="fi" placeholder="Nuevo cargo…" style="max-width:240px">
+    <button class="btn bp bsm" onclick="addRank()">+ Agregar</button>
+  </div>
+  <div class="tw card p0"><table><thead><tr><th>Cargo</th><th></th></tr></thead><tbody>
+  ${S.ranks.map(r=>`<tr><td style="font-weight:600">${esc(r)}</td>
+    <td><button class="btn bd bsm" onclick="delRank('${esc(r)}')">🗑</button></td></tr>`).join("")
+    ||`<tr><td colspan="2" class="empty">Sin cargos</td></tr>`}
+  </tbody></table></div>`;
+}
+window.addRank=async()=>{ const n=$("#rkNew").value.trim(); if(!n)return;
+  await insert("ranks",{name:n},true); await loadMasters(); toast("Cargo agregado","ok"); renderAdmin(); };
+window.delRank=async n=>{ await del("ranks",`name=eq.${encodeURIComponent(n)}`); await loadMasters(); toast("Eliminado","ok"); renderAdmin(); };
+
+function adminCfg(){
+  $("#adminBody").innerHTML=`
+  <div class="card" style="max-width:420px">
+    <div class="modtitle">Configuración de turnos</div>
+    <div class="fg"><label class="fl">Inicio ☀ Día (hora 0–23)</label>
+      <input id="cfgDs" class="fi" type="number" min="0" max="23" value="${S.settings.day_start??6}">
+      <div class="muted" style="font-size:11px;margin-top:3px">${S.settings.day_start??6}:00 ~ ${(S.settings.night_start??18)-1}:59 = ☀ Día</div></div>
+    <div class="fg"><label class="fl">Inicio 🌙 Noche (hora 0–23)</label>
+      <input id="cfgNs" class="fi" type="number" min="0" max="23" value="${S.settings.night_start??18}"></div>
+    <button class="btn bp bsm" onclick="saveCfg()">Guardar</button>
+  </div>`;
+}
+window.saveCfg=async()=>{
+  await insert("settings",[{key:"day_start",value:$("#cfgDs").value},{key:"night_start",value:$("#cfgNs").value}],true);
+  await loadMasters(); toast("Configuración guardada","ok"); buildNav(adminTab); renderAdmin();
+};
+
+/* ══════════════════════════════════════════════════════════════
+   엑셀 — 직원 마스터 양식 다운 / 검증 업로드
+   ══════════════════════════════════════════════════════════════ */
+const TPL_HDRS=["Cód.(emp_id)","Nombre","Proceso","Cargo","Tipo Turno","Turno(Día/Noche)","H.Estándar","Situación","F.Ingreso"];
+function downloadTemplate(){
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet([
+    TPL_HDRS,
+    ["EMP999","Ejemplo López","Proceso A","Operario","Turno A","Día","06:00","Activo",today()]
+  ]);
+  ws["!cols"]=TPL_HDRS.map(()=>({wch:20}));
+  XLSX.utils.book_append_sheet(wb,ws,"Empleados");
+  const maxRef=Math.max(S.processes.length,S.ranks.length,EMP_TYPES.length,STATUSES.length);
+  const ref=[["Procesos:","Cargos:","Tipos:","Situación:"]];
+  for(let i=0;i<maxRef;i++) ref.push([S.processes[i]?.name||"",S.ranks[i]||"",EMP_TYPES[i]||"",STATUSES[i]||""]);
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(ref),"Referencia");
+  XLSX.writeFile(wb,"Plantilla_Empleados.xlsx");
+  toast("Plantilla descargada","ok");
+}
+async function importEmployees(input){
+  const f=input.files[0]; if(!f)return; input.value="";
+  const buf=await f.arrayBuffer();
+  const wb=XLSX.read(buf,{type:"array"});
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:""}).slice(1);
+  const procNames=S.processes.map(p=>p.name);
+  const good=[], errors=[]; let ln=1;
+  for(const r of rows){ ln++;
+    if(!r[0] && !r[1]) continue;
+    const emp_id=String(r[0]||"").trim().toUpperCase();
+    const name=String(r[1]||"").trim();
+    const process=String(r[2]||"").trim();
+    const errs=[];
+    if(!emp_id) errs.push("código vacío");
+    if(!name) errs.push("nombre vacío");
+    if(!process) errs.push("proceso vacío");
+    else if(!procNames.includes(process)) errs.push(`proceso "${process}" no existe`);
+    const emp_type=String(r[4]||"Turno A").trim();
+    if(!EMP_TYPES.includes(emp_type)) errs.push(`tipo "${emp_type}" inválido`);
+    const shift=String(r[5]||"Día").trim();
+    if(!SHIFTS.includes(shift)) errs.push(`turno "${shift}" inválido`);
+    const std=String(r[6]||"06:00").trim();
+    if(!/^\d{1,2}:\d{2}$/.test(std)) errs.push(`hora "${std}" inválida`);
+    const status=String(r[7]||"Activo").trim();
+    if(!STATUSES.includes(status)) errs.push(`situación "${status}" inválida`);
+    let hire=r[8]; if(hire instanceof Date) hire=hire.toLocaleDateString("en-CA");
+    hire=String(hire||"").trim();
+    if(errs.length){ errors.push({ln,emp_id,errs}); continue; }
+    good.push({emp_id,name,process,rank:String(r[3]||"Operario").trim()||"Operario",
+      emp_type,shift,std_time:std,status,hire_date:hire});
+  }
+  // 미리보기 & 확인
+  openModal(`<div class="modtitle">📥 Importar empleados</div>
+    <div class="flex mb12">
+      <span class="pill pl-ok">✅ ${good.length} válidos</span>
+      <span class="pill ${errors.length?'pl-aus':'pl-none'}">⚠ ${errors.length} con error</span>
+    </div>
+    ${errors.length?`<div class="tw" style="max-height:200px;overflow:auto;margin-bottom:12px"><table><thead><tr><th>Fila</th><th>Cód.</th><th>Problema</th></tr></thead><tbody>
+      ${errors.map(e=>`<tr><td class="mono">${e.ln}</td><td class="mono">${esc(e.emp_id||"—")}</td><td style="color:var(--err)">${esc(e.errs.join(", "))}</td></tr>`).join("")}
+    </tbody></table></div>`:""}
+    <div class="flex">
+      <button class="btn bok" onclick='confirmImport()' ${good.length?"":"disabled"}>Guardar ${good.length} empleados</button>
+      <button class="btn bg" onclick="closeModal()">Cancelar</button>
+    </div>`);
+  window.__importBatch=good;
+}
+window.confirmImport=async()=>{
+  const good=window.__importBatch||[]; if(!good.length)return;
+  // 새 직급 자동 등록
+  const newRanks=[...new Set(good.map(g=>g.rank).filter(r=>!S.ranks.includes(r)))];
+  for(const r of newRanks) await insert("ranks",{name:r},true).catch(()=>{});
+  await insert("employees",good,true);
+  closeModal(); await loadMasters(); toast(`✓ ${good.length} empleados importados`,"ok"); renderAdmin();
+};
+
+/* ══════════════════════════════════════════════════════════════
+   엑셀 — 출결 내보내기
+   ══════════════════════════════════════════════════════════════ */
+async function exportTodayExcel(){
+  const recs=await todayRecords();
+  const aoa=[["Cód.","Nombre","Proceso","Cargo","Turno","Entrada","Estado","Tipo","Ausencia"]];
+  recs.forEach(r=>{ const a=r.a;
+    aoa.push([r.emp_id,r.name,a&&a.work_process||r.process,r.rank,
+      a?a.shift_type:"",a?a.check_in||"":"",a?a.att_status:"Ausente",a?a.work_type:"",a?a.abs_type:""]);});
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(aoa),"Hoy");
+  XLSX.writeFile(wb,`Asistencia_${today()}.xlsx`);
+  toast("Excel del día descargado","ok");
+}
+async function exportMonthlyAll(){
+  await exportMatrix(activeEmps(),`Asistencia_${histY}-${String(histM).padStart(2,"0")}.xlsx`);
+}
+window.exportMonthlyOne=async id=>{
+  const e=S.employees.find(x=>x.emp_id===id); if(e) await exportMatrix([e],`${id}_${histY}-${String(histM).padStart(2,"0")}.xlsx`);
+};
+async function exportMatrix(emps,fname){
+  const y=histY,m=histM, days=new Date(y,m,0).getDate();
+  const pref=`${y}-${String(m).padStart(2,"0")}`;
+  const recs=await sel("attendance",`att_date=like.${pref}*&select=*`);
+  const byEmp={}; (recs||[]).forEach(r=>{ (byEmp[r.emp_id]=byEmp[r.emp_id]||{})[r.att_date]=r; });
+  const head=["Cód.","Nombre","Proceso","Cargo","Tipo",...Array.from({length:days},(_,i)=>i+1),"Pres.","Tard.","Aus.","H.Ex.","Recup."];
+  const aoa=[head];
+  const todStr=today();
+  emps.forEach(e=>{
+    const recMap=byEmp[e.emp_id]||{};
+    const c={p:0,t:0,a:0,e:0,r:0};
+    const row=[e.emp_id,e.name,e.process,e.rank,e.emp_type];
+    for(let d=1;d<=days;d++){
+      const ds=`${pref}-${String(d).padStart(2,"0")}`;
+      const wd=new Date(ds+"T00:00:00").getDay();
+      const rec=recMap[ds];
+      if(wd===0||wd===6){ row.push("Des"); continue; }
+      if(ds>todStr){ row.push(""); continue; }
+      if(rec){ const st=rec.att_status, wt=rec.work_type;
+        let sym={"Presente":"○","Tardanza":"△","Ausente":"✕"}[st]||"✕";
+        if(wt==="H.Extra")sym="★"; if(wt==="Recuperación")sym="◆";
+        row.push(sym);
+        if(st==="Presente")c.p++; if(st==="Tardanza")c.t++; if(st==="Ausente")c.a++;
+        if(wt==="H.Extra")c.e++; if(wt==="Recuperación")c.r++;
+      } else { row.push("✕"); c.a++; }
+    }
+    row.push(c.p,c.t,c.a,c.e,c.r); aoa.push(row);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws["!cols"]=[{wch:9},{wch:16},{wch:11},{wch:12},{wch:12},...Array.from({length:days},()=>({wch:4})),...Array(5).fill({wch:6})];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,pref);
+  XLSX.writeFile(wb,fname);
+  toast("Excel descargado","ok");
+}
+
+/* ══════════════════════════════════════════════════════════════
+   초기화
+   ══════════════════════════════════════════════════════════════ */
+async function boot(){
+  if(!CONFIGURED){
+    $("#view").innerHTML=`<div class="card" style="max-width:640px;margin:40px auto">
+      <div class="modtitle">⚙ Configuración requerida</div>
+      <p class="muted" style="line-height:1.7">Este archivo <b>index.html</b> aún no está conectado a Supabase.<br>
+      Abra el archivo y complete <code>CONFIG.SUPABASE_URL</code> y <code>CONFIG.SUPABASE_ANON_KEY</code>
+      con los datos de su proyecto (Supabase → Project Settings → API).</p></div>`;
+    return;
+  }
+  try{ await loadMasters(); }
+  catch(e){ $("#view").innerHTML=`<div class="card" style="max-width:640px;margin:40px auto">
+      <div class="modtitle">⚠ Error de conexión</div>
+      <p class="muted">No se pudo conectar a Supabase. Verifique la URL/clave y que el esquema (schema.sql) esté ejecutado.<br><br>
+      <span class="mono" style="font-size:12px">${esc(e.message)}</span></p></div>`; return; }
+  if(!location.hash) location.hash="#/";
+  router();
+}
+boot();
+</script>
+</body>
+</html>
